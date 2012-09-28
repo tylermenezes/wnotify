@@ -2,7 +2,7 @@
 var wnotify_watcher = new (function(){
     var _this = this;
     var base = 'http://wnotify.menez.es/track/'
-    
+
     this.public_key = null;
     this.private_key = null;
 

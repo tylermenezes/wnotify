@@ -5,31 +5,33 @@ import datetime
 import hashlib
 import json
 import time
+import email
 import os
 
 class AsyncCallbackMixin(object):
-    listeners = collections.defaultdict(list)
+    listeners = collections.defaultdict(collections.defaultdict)
     def wait_for_message(self, id, callback):
-        AsyncCallbackMixin.listeners[id].append(callback)
+        if not(id in AsyncCallbackMixin.listeners):
+            AsyncCallbackMixin.listeners[id] = collections.defaultdict(list)
 
-    def stop_waiting_for_message(self, id, callback):
-        AsyncCallbackMixin.listeners[id].remove(callback)
+        AsyncCallbackMixin.listeners[id][self.client_id].append(callback)
 
     def send_message(self, id, message):
-        while True:
-            try:
-                callback = AsyncCallbackMixin.listeners[id].pop()
-            except:
-                # No one is listening here
-                break
+        for client in AsyncCallbackMixin.listeners[id].values():
+            while True:
+                try:
+                    callback = client.pop()
+                except:
+                    # No one is listening here
+                    break
 
-            try:
-                callback(message)
-            except:
-                # This connection was closed, continue to the next one
-                pass
-            else:
-                break
+                try:
+                    callback(message)
+                except:
+                    # This connection was closed, continue to the next one
+                    pass
+                else:
+                    break
 
 
 class WnotifyMessageMixin(AsyncCallbackMixin):
@@ -50,13 +52,18 @@ class WnotifyMessageMixin(AsyncCallbackMixin):
                 "time": int(time.time()),
                 "data": data
             }))
-        else:
-            for val in WnotifyMessageMixin.id_lookup:
-                print val + "\n"
 
 class ListenerHandler(tornado.web.RequestHandler, WnotifyMessageMixin):
     @tornado.web.asynchronous
     def get(self, private_id):
+        if 'client_id' in self.request.arguments:
+            self.client_id = self.request.arguments['client_id'][0];
+        else:
+            if self.request.remote_ip == '127.0.0.1':
+                self.client_id = self.request.headers.get("X-Real-Ip", None)
+            else:
+                self.client_id = self.request.remote_ip
+
         def callback(message):
             self.set_header('Content-type', 'application/json')
             self.set_header('Access-Control-Allow-Origin', '*')
@@ -125,9 +132,7 @@ class StaticFileHandler(tornado.web.RequestHandler):
         # content has not been modified
         ims_value = self.request.headers.get("If-Modified-Since")
         if ims_value is not None:
-            date_tuple = email.utils.parsedate(ims_value)
-            if_since = datetime.datetime.fromtimestamp(time.mktime(date_tuple))
-            if if_since >= modified:
+            if ims_value >= modified:
                 self.set_status(304)
                 return
 

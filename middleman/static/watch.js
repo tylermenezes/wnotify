@@ -68,6 +68,19 @@ window.wnotify.watcher = new (function(){
         }
 	}
 
+    var randomString = function (length) {
+        var result, chars;
+        result = "";
+        chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+        while (length > 0) {
+            result += chars.charAt(Math.min(Math.floor(Math.random() * chars.length)));
+            length--;
+        }
+        return result;
+    }
+
+    var client_id = randomString(50);
+
     var base = 'http://wnotify.menez.es/'
     var endpoint = null;
 
@@ -115,6 +128,7 @@ window.wnotify.watcher = new (function(){
             {
                 setTimeout(startLongPollThread, 100);
             },
+            data: {"client_id": client_id},
             cache: false,
             dataType: 'json'
         });
@@ -128,10 +142,15 @@ window.wnotify.watcher = new (function(){
 
         this.event(event).register(function(data)
         {
-            var sound_obj = jQuery('<audio src="'+ base + 'static/sounds/' + sound + '.mp3" />');
-            jQuery("body").append(sound_obj);
-            sound_obj.get(0).play();
-        })
+            _this.play_sound(sound);
+        });
+    }
+
+    this.play_sound = function(sound)
+    {
+        var sound_obj = jQuery('<audio src="'+ base + 'static/sounds/' + sound + '.mp3" />');
+        jQuery("body").append(sound_obj);
+        sound_obj.get(0).play();
     }
 
     this.start = function()
@@ -139,7 +158,7 @@ window.wnotify.watcher = new (function(){
         if (wnotify.private_key == null) {
             throw "Invalid private key!";
         }
-        
+
         endpoint = base + 'watch/' + wnotify.private_key;
         startLongPollThread();
         startLongPollThread();
